@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Health Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: #f5f5dc;
+      font-family: 'Segoe UI', sans-serif;
+      color: #003366;
+      text-align: center;
+      padding: 30px 10px;
+    }
+
+    .card {
+      background: #e0f7fa;
+      border: 2px solid #003366;
+      border-radius: 20px;
+      padding: 30px;
+      width: 300px;
+      margin: auto;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .charts-container {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 800px;
+      height: 450px !important;
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ESP32 Real-Time Health Monitor</h1>
+
+  <div class="card">
+    🌡️ Temperature: <span id="temp">--</span> °C<br><br>
+    💓 Pulse: <span id="pulse">--</span> bpm
+  </div>
+
+  <div class="charts-container">
+    <canvas id="tempChart"></canvas>
+    <canvas id="pulseChart"></canvas>
+  </div>
+
+  <script>
+    const ip = "http://192.168.X.X";  // 🔁 Replace with your ESP32 local IP
+
+    const labels = [];
+    const tempData = [];
+    const pulseData = [];
+
+    const tempChart = new Chart(document.getElementById("tempChart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Temperature (°C)",
+          data: tempData,
+          borderColor: "#0077b6",
+          backgroundColor: "rgba(0,119,182,0.1)",
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { title: { display: true, text: "Time (s)" } },
+          y: { title: { display: true, text: "°C" }, suggestedMin: 20, suggestedMax: 40 }
+        }
+      }
+    });
+
+    const pulseChart = new Chart(document.getElementById("pulseChart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "Pulse (bpm)",
+          data: pulseData,
+          borderColor: "#e63946",
+          backgroundColor: "rgba(230,57,70,0.1)",
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { title: { display: true, text: "Time (s)" } },
+          y: { title: { display: true, text: "BPM" }, suggestedMin: 50, suggestedMax: 120 }
+        }
+      }
+    });
+
+    let startTime = Date.now();
+
+    async function fetchData() {
+      try {
+        const res = await fetch(`${ip}/data`);
+        const json = await res.json();
+
+        const time = ((Date.now() - startTime) / 1000).toFixed(1);
+        const temp = parseFloat(json.temperature);
+        const pulse = parseFloat(json.pulse);
+
+        if (!isNaN(temp) && !isNaN(pulse)) {
+          labels.push(time);
+          tempData.push(temp);
+          pulseData.push(pulse);
+
+          if (labels.length > 30) {
+            labels.shift();
+            tempData.shift();
+            pulseData.shift();
+          }
+
+          document.getElementById("temp").textContent = temp;
+          document.getElementById("pulse").textContent = pulse;
+
+          tempChart.update();
+          pulseChart.update();
+        }
+      } catch (e) {
+        console.error("Error fetching data:", e);
+      }
+    }
+
+    setInterval(fetchData, 1000);
+    fetchData();
+  </script>
+
+</body>
+</html>
